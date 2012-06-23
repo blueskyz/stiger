@@ -1,0 +1,57 @@
+(by http://www.locoy.com 火车头 2008-04-08) http://blog.locoy.com/read-44.html
+这几天在还在优化中文分词，词库一直是个问题，所以重新整理了网上几个流行的词库，先发上一个比较小巧的词库（数据量92984）上来，带词性和tf/idf词频统计
+大致的词性从以下代码中可以获得,整理好的词库文件在附件中下载,编码是UTF-8，比较适合小型项目使用，更大的还在整理中
+            HtPos.Add("a", "1073741824");
+            HtPos.Add("b", "536870912");
+            HtPos.Add("c", "268435456");
+            HtPos.Add("d", "134217728");
+            HtPos.Add("e", "67108864");
+            HtPos.Add("f", "33554432");
+            HtPos.Add("i", "16777216");
+            HtPos.Add("l", "8388608");
+            HtPos.Add("m", "4194304");
+            HtPos.Add("mq", "2097152");
+            HtPos.Add("n", "1048576");
+            HtPos.Add("o", "524288");
+            HtPos.Add("p", "262144");
+            HtPos.Add("q", "131072");
+            HtPos.Add("r", "65536");
+            HtPos.Add("s", "32768");
+            HtPos.Add("t", "16384");
+            HtPos.Add("u", "8192");
+            HtPos.Add("v", "4096");
+            HtPos.Add("x", "1024");
+            HtPos.Add("y", "512");
+            HtPos.Add("z", "256");
+            HtPos.Add("nr", "128");
+            HtPos.Add("ns", "64");
+            HtPos.Add("nt", "32");
+            HtPos.Add("nz", "8");
+ 
+            HtPosCsw.Add("a", "形容词");
+            HtPosCsw.Add("b", "区别词");
+            HtPosCsw.Add("c", "连词");
+            HtPosCsw.Add("d", "副词");
+            HtPosCsw.Add("e", "叹词");
+            HtPosCsw.Add("f", "方位词");
+            HtPosCsw.Add("i", "成语");
+            HtPosCsw.Add("l", "习惯用语");
+            HtPosCsw.Add("m", "数词");
+            HtPosCsw.Add("mq", "数量词");
+            HtPosCsw.Add("n", "名词");
+            HtPosCsw.Add("o", "拟声词");
+            HtPosCsw.Add("p", "介词");
+            HtPosCsw.Add("q", "量词");
+            HtPosCsw.Add("r", "代词");
+            HtPosCsw.Add("s", "处所词");
+            HtPosCsw.Add("t", "时间词");
+            HtPosCsw.Add("u", "助词");
+            HtPosCsw.Add("v", "动词");
+            HtPosCsw.Add("x", "非语素字");
+            HtPosCsw.Add("y", "语气词");
+            HtPosCsw.Add("z", "状态词");
+            HtPosCsw.Add("nr", "人名");
+            HtPosCsw.Add("ns", "地名");
+            HtPosCsw.Add("nt", "机构团体");
+            HtPosCsw.Add("nz", "其他专名");
+            HtPosCsw.Add("un", "未知词性");
