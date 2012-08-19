@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <getopt.h>
+#include <errno.h>
 
 #include "st_utils.h"
 #include "st_darray.h"
@@ -159,6 +161,7 @@ void testMode(st_darts* pDarts, char* encode)
   }
 }
 
+
 void testModeCutWord(st_darts* pDarts, char* encode)
 {
   st_timer stTimerType = ST_TIMER_MICRO_SEC;
@@ -196,12 +199,12 @@ void testModeCutWord(st_darts* pDarts, char* encode)
       char* off = output;
       int offsetPos = 0;
       for (int i = uLen - 1; i >= 0; --i){
-	int nStep = wordPos[i] - offsetPos;
-	while(nStep--){
-	  if (0 == stUTF8Decode((BYTE**)&off)){
-	    break;
-	  }
-	}
+	      int nStep = wordPos[i] - offsetPos;
+	      while(nStep--){
+		      if (0 == stUTF8Decode((BYTE**)&off)){
+			      break;
+		      }
+	      }
 	offsetPos = wordPos[i];
 	if (i == uLen - 1){
 	  begin = off;
@@ -225,6 +228,48 @@ void testModeCutWord(st_darts* pDarts, char* encode)
   }
 }
 
+void testModeCutWordForByte(st_darts* pDarts, char* encode)
+{
+  st_timer stTimerType = ST_TIMER_MICRO_SEC;
+  char input[MAX_PATH];
+  char output[MAX_PATH];
+  const char* word[1024] = { 0 };
+  uint32_t wordLen[1024] = { 0 };
+  char outWord[MAX_PATH];
+  //memset(input, 0, sizeof(input));
+  //memset(output, 0, sizeof(output));
+  st_darts_state* dState = stDartsStateNew(pDarts);
+
+  printf("Plz input # ");
+  fflush(stdout);
+  while (fgets(input, MAX_PATH, stdin)){
+    if (strlen(input)-1 == 0){
+      printf("Plz input # ");
+      fflush(stdout);
+      continue;
+    }
+    input[strlen(input)-1] = '\0';
+    stLog("input=%s, len=%d", input, strlen(input));
+    stConvertCode(encode, "utf-8", input, strlen(input), output, MAX_PATH);
+    uint32_t uLen = strlen(output);
+    stLog("outbuf=%s, len=%u", output, uLen);
+
+    long long queryBeginTime = stTimer(stTimerType);
+    stCutWordByte(pDarts, dState, output, word, wordLen, &uLen, 10);
+    long long queryEndTime = stTimer(stTimerType);
+    stLog("result=%u, cost time=%lldus", uLen, queryEndTime - queryBeginTime);
+
+    for (int i = uLen - 1; i >= 0; --i){
+      memcpy(outWord, word[i], wordLen[i]);
+      outWord[wordLen[i]] = '\0';
+      stLog("query i=%d, word=%s, len=%u",
+	    (uLen - 1 - i), outWord, wordLen[i]);
+    }
+    printf("Plz input # ");
+    fflush(stdout);
+  }
+}
+
 void usage()
 {
   printf("usage: ./st_tools <dictMode> <task> [option]\n"
@@ -233,7 +278,7 @@ void usage()
 	 "	-l file: load dictionary from darts file\n"
 	 "  task:\n"
 	 "	-c file: create darts file from memory\n"
-	 "	-t mode: test mode [0. test word  1. test cut word]\n"
+	 "	-t mode: test mode [0. test word  1. test cut word 2. test cut word for byte]\n"
 	 "	-h: help\n"
 	 "  option:\n"
 	 "	-n: <dictMode = -s> word count, default 10\n"
@@ -255,6 +300,10 @@ int main(int argc, char *argv[])
   int32_t nStatisticUnit = 0;
   char* encode[] = {"utf-8", "gbk"};
 
+  if (argc == 1){
+      usage();
+      return 0;
+  }
   int c = 0;
   while ((c = getopt(argc, argv, "s:l:c:t:n:u:m:h")) != -1){
     switch(c){
@@ -285,7 +334,9 @@ int main(int argc, char *argv[])
     case 't':
       bModeTest = 1;
       nModeTest = atoi(optarg);
-      if (nModeTest != 0 && nModeTest != 1){
+      if (nModeTest != 0 
+          && nModeTest != 1
+          && nModeTest != 2){
 	stErr("error test mode %d", nModeTest);
 	usage();
 	return -1;
@@ -350,6 +401,8 @@ int main(int argc, char *argv[])
       testMode(g_s_pDarts, encode[nEncodeIndex]);
     if (nModeTest == 1)
       testModeCutWord(g_s_pDarts, encode[nEncodeIndex]);
+    if (nModeTest == 2)
+      testModeCutWordForByte(g_s_pDarts, encode[nEncodeIndex]);
     else {
       usage();
       return -1;

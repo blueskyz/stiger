@@ -11,6 +11,8 @@
 #ifndef _ST_DARTS_H_
 #define _ST_DARTS_H_
 
+#include <stdint.h>
+
 typedef struct st_darts st_darts;
 typedef struct st_darts_state st_darts_state;
 
@@ -143,5 +145,13 @@ int stCutWord(st_darts* handler,
 	      uint32_t* posArr,
 	      uint32_t* pLen,
 	      uint32_t uStep /* int bAsc */ );
+
+int stCutWordByte(st_darts* handler,
+		st_darts_state* dState,
+		const char* str,
+		const char** wordArr,
+		uint32_t* wordLenArr,
+		uint32_t* pLen,
+		uint32_t uStep /* int bAsc */ );
 
 #endif /* _ST_DARTS_H_ */

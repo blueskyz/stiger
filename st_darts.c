@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 
 #include "st_utils.h"
 #include "st_darray.h"
@@ -606,26 +607,29 @@ int stCutWord(st_darts* handler,
       stDebug("test i=%u, l=%u, r=%u, j=%u", i, l, r, j);
       stDartsStateReset(handler, dState);
       uint32_t k = j;
+      uint32_t oldMatch = nMatch;
       for ( ; k < r; ++k){
 	stDebug("test i=%u, l=%u, r=%u, j=%u, k=%u, iCode=%u",
 		i, l, r, j, k, uCodeArr[k]);
 	ST_DARTS_STATE_SET_KEY(dState, uCodeArr[k]);
 	int nFind = stDartsFindNext(handler, dState);
 	if (nFind < 0){
-	  stDebug("can't find icode=%u", uCodeArr[i]);
+	  stDebug("can't find icode=%u", uCodeArr[k]);
 	  break;
 	}
 	else if (ST_DARTS_STATE_END(dState)){
 	  stDebug("End");
 	  break;
 	}
-	else if ((r == k + 1) && ST_DARTS_STATE_HAS_VALUE(dState)){
+	else if (ST_DARTS_STATE_HAS_VALUE(dState)){
 	  // find word
-	  bMatch = 1;
 	  stDebug("find word wordId=%d, l=%u, r=%u, j=%u",
 		  ST_DARTS_STATE_VALUE(dState), l, r, j);
 	  posArr[nMatch] = j;
 	  wordIdArr[nMatch++] = ST_DARTS_STATE_VALUE(dState);
+	}
+	if ((r == k + 1) && ST_DARTS_STATE_HAS_VALUE(dState)){
+	  bMatch = 1;
 	  break;
 	}
       }
@@ -633,10 +637,105 @@ int stCutWord(st_darts* handler,
 	r = j;
 	break;
       }
+      nMatch = oldMatch;
     }
     if (!bMatch){
 	--r;
     }
+  }
+  *pLen = nMatch;
+  return 0;
+}
+
+struct term {
+    uint32_t uCode;
+    const char* pWord;
+    const char* pWordEnd;
+};
+
+/** 
+ * @brief automatic segmentation model
+ * 
+ * @param str the string length = uLen, the str length < 1024
+ * @param wordIdArr wordId list, array length = 2 * uLen
+ * @param posArr the word position, array length = 2 * uLen
+ * @param uLen
+ * @param bAsc 
+ * 
+ * @return 0: succ, -1: fail
+ */
+int stCutWordByte(st_darts* handler,
+		st_darts_state* dState,
+		const char* str,
+		const char** wordArr,
+		uint32_t* wordLenArr,
+		uint32_t* pLen,
+		uint32_t uStep /* int bAsc */ )
+{
+  assert(NULL != str && 0 != *pLen && 0 != uStep);
+  struct term termCodeArr[ST_MAGIC_SENTENCE] = { {0, 0, 0} };
+  int hasValue[ST_MAGIC_SENTENCE][16];
+  int i = 0;
+  const char* srcStr = str;
+  const char* preStr = str;
+  memset( hasValue, 0, sizeof(hasValue));
+  for (i = 0; i < ST_MAGIC_SENTENCE ; ++i){
+    int iCode = stUTF8Decode((BYTE**)&str);
+    if (0 == iCode){
+      break;
+    }
+    if (iCode == -1){
+      return -1;
+    }
+    else {
+      termCodeArr[i].uCode = iCode;
+      termCodeArr[i].pWord = preStr;
+      termCodeArr[i].pWordEnd = str;
+      preStr = str;
+    }
+  }
+  uStep = i < uStep ? i : uStep;
+  uint32_t l = i - uStep;
+  uint32_t r = i;
+  int nMatch = 0;
+  stDebug("test i=%u, l=%u, r=%u", i, l, r);
+  for ( ; r > 0; ){
+    uStep = r < uStep ? r : uStep;
+    l = r - uStep;
+    uint32_t j = l;
+    for ( ; j < r; ++j){
+      stDebug("test i=%u, l=%u, r=%u, j=%u", i, l, r, j);
+      stDartsStateReset(handler, dState);
+      uint32_t k = j;
+      for ( ; k < r; ++k){
+	stDebug("test i=%u, l=%u, r=%u, j=%u, k=%u, iCode=%u",
+		i, l, r, j, k, termCodeArr[k].uCode);
+	ST_DARTS_STATE_SET_KEY(dState, termCodeArr[k].uCode);
+	int nFind = stDartsFindNext(handler, dState);
+	if (nFind < 0){
+	  stDebug("can't find icode=%u", termCodeArr[k].uCode);
+	  break;
+	}
+	else if (ST_DARTS_STATE_END(dState)){
+	  stDebug("End");
+	  break;
+	}
+	else if (ST_DARTS_STATE_HAS_VALUE(dState)){
+	  // find word
+	  stDebug("find word wordId=%d, l=%u, r=%u, j=%u",
+		  ST_DARTS_STATE_VALUE(dState), l, r, j);
+          unsigned int uLen = termCodeArr[k].pWordEnd - termCodeArr[j].pWord;
+	  unsigned int uOff = termCodeArr[j].pWord - srcStr;
+	  if (hasValue[uOff][uLen] == 0){
+		  stDebug("zsz : ------ uOff=%d, uLen=%d, havValue=%d", uOff, uLen, hasValue[uOff][uLen]);
+	    hasValue[uOff][uLen] = 1;
+	    wordLenArr[nMatch] = uLen;
+	    wordArr[nMatch++] = termCodeArr[j].pWord;
+	  }
+	}
+      }
+    }
+    --r;
   }
   *pLen = nMatch;
   return 0;

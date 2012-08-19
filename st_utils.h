@@ -16,7 +16,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdint.h>
-
+#include <fcntl.h>
 
 #ifndef BYTE
 #define BYTE unsigned char
@@ -29,10 +29,14 @@
 #define stDetail(preMsg, logMsgFmt, args...)				\
   {									\
     char buf[MAX_PATH];							\
+    char logBuf[MAX_PATH];							\
     memset(buf, 0, sizeof(buf));					\
     snprintf(buf, MAX_PATH-1, "%s %s\n", preMsg, logMsgFmt); \
     buf[MAX_PATH-1] = '\0';						\
-    printf(buf, ##args);						\
+    snprintf(logBuf, MAX_PATH-1, buf, ##args);						\
+    logBuf[MAX_PATH-1] = '\0';						\
+    printf(logBuf);						\
+    stLogToFile(logBuf, strlen(logBuf));						\
     fflush(stdout);							\
   }									\
 
@@ -50,9 +54,12 @@ int stUTF8Decode(BYTE** pBuf);
 int stConvertCode(const char* srcCode,
 		  const char* destCode,
 		  char* src,
-		  unsigned int srcLen,
+		  size_t srcLen,
 		  char* dest,
-		  unsigned int destLen);
+		  size_t destLen);
+
+// log file
+void stLogToFile();
 
 // time method
 typedef enum { ST_TIMER_SEC, ST_TIMER_MILLI_SEC, ST_TIMER_MICRO_SEC } st_timer;

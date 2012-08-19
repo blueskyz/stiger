@@ -8,8 +8,6 @@
  * 
  */
 
-#include "st_utils.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,6 +18,9 @@
 #include <iconv.h>
 
 #include <sys/time.h>
+#include <unistd.h>
+
+#include "st_utils.h"
 
 // ------------------------------------------------------------
 // code method
@@ -70,9 +71,9 @@ int stUTF8Decode(BYTE** ppBuf)
 int stConvertCode(const char* srcCode,
 		  const char* destCode,
 		  char* src,
-		  unsigned int srcLen,
+		  size_t srcLen,
 		  char* dest,
-		  unsigned int destLen)
+		  size_t destLen)
 {
   if (NULL == srcCode || NULL == destCode){
     return -1;
@@ -98,6 +99,14 @@ void unicodeToUtf16(int16_t* iCode, unsigned int uSize)
     tmp[0] = tmp[1];
     tmp[1] = tmpC;
   }
+}
+
+
+void stLogToFile(const char* content, unsigned int uLen)
+{
+  int log = open("/var/log/mysql.tft.log", O_WRONLY, O_APPEND | O_CREAT);
+  write(log, content, uLen);
+  close(log);
 }
 
 // ------------------------------------------------------------
