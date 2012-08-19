@@ -18,6 +18,7 @@
 #include <iconv.h>
 
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "st_utils.h"
@@ -104,7 +105,9 @@ void unicodeToUtf16(int16_t* iCode, unsigned int uSize)
 
 void stLogToFile(const char* content, unsigned int uLen)
 {
-  int log = open("/var/log/mysql.tft.log", O_WRONLY, O_APPEND | O_CREAT);
+  int log = open("/var/log/mysql/mysql.tft.log", 
+		  O_WRONLY | O_APPEND | O_CREAT,
+		  S_IRWXU);
   write(log, content, uLen);
   close(log);
 }
