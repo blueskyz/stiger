@@ -374,7 +374,7 @@ st_darts_state* stDartsStateNew(st_darts* handler)
  * 
  * @return 
  */
-int stDartsStateFree(st_darts_state* handler, st_darts_state* state)
+int stDartsStateFree(st_darts* handler, st_darts_state* state)
 {
   if (NULL == handler || NULL == state){
     return -1;
