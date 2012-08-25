@@ -21,6 +21,14 @@ typedef enum { eds_begin = 0x01,
 	       eds_end = 0x04,
 	       eds_has_value = 0x08 } st_e_darts_state;
 
+struct term {
+    uint32_t uCode;
+    const char* pWord;
+    const char* pWordEnd;
+};
+
+#define MAX_ZH_WORD_LEN 0x10
+#define MAX_ZH_WORD_MASK (MAX_ZH_WORD_LEN - 1)
 struct st_darts_state
 {
   unsigned int uMagic;
@@ -28,6 +36,18 @@ struct st_darts_state
   unsigned int uValue;
   unsigned int uSState;
   int state;
+  const char* start;
+  const char* end;
+  uint32_t uHasDecWords;
+  uint32_t uHasProcWords;
+  uint32_t uCurWordPos;
+  struct term cacheCode[MAX_ZH_WORD_LEN];
+};
+
+struct st_wordInfo {
+  uint32_t wordId;
+  uint32_t wordLen;
+  const char* pWord;
 };
 
 #define ST_DARTS_STATE_CMP(st_state, state_value) \
@@ -61,6 +81,8 @@ st_darts* stDartsNew(unsigned int baseArrayLen);
  */
 int stDartsFree(st_darts* handler);
 
+int stDartsFreeMmap(st_darts* handler);
+
 /** 
  * @brief save darts to file
  * 
@@ -82,14 +104,19 @@ int stDartsSave(st_darts* handler, const char* filePath);
  */
 st_darts* stDartsLoad(const char* filePath);
 
+st_darts* stDartsLoadMmap(const char* filePath);
+
 /** 
- * @brief create search state
+ * @brief init search state
  * 
  * @param handler 
  * 
  * @return not null: succ/the pointer for state, null: fail
  */
-st_darts_state* stDartsStateNew(st_darts* handler);
+st_darts_state* stDartsStateInit(st_darts* handler, 
+				st_darts_state* pDartsState,
+				const char* start,
+				const char* end);
 
 /** 
  * @brief destroy state object
@@ -100,16 +127,6 @@ st_darts_state* stDartsStateNew(st_darts* handler);
  * @return 
  */
 int stDartsStateFree(st_darts* handler, st_darts_state* state);
-
-/** 
- * @brief reset state for reuse
- *
- * @param handler
- * @param state 
- * 
- * @return 0: succ, -1: fail
- */
-int stDartsStateReset(st_darts* handler, st_darts_state* state);
 
 /** 
  * @brief find value, state for check
@@ -138,7 +155,7 @@ int stDartsPut(st_darts* handler,
 	       unsigned int uValue);
 
 
-int stCutWord(st_darts* handler,
+int stDartsCutWord(st_darts* handler,
 	      st_darts_state* dState,
 	      const char* str,
 	      uint32_t* wordIdArr,
@@ -146,12 +163,16 @@ int stCutWord(st_darts* handler,
 	      uint32_t* pLen,
 	      uint32_t uStep /* int bAsc */ );
 
-int stCutWordByte(st_darts* handler,
+int stDartsNextWord(st_darts* handler,
+		st_darts_state* dState,
+		struct st_wordInfo* pWordInfo);
+
+int stDartsCutWordByte(st_darts* handler,
 		st_darts_state* dState,
 		const char* str,
-		const char** wordArr,
-		uint32_t* wordLenArr,
-		uint32_t* pLen,
+		const char* end,
+		struct st_wordInfo* pWordInfo,
+		uint32_t* pWordCount,
 		uint32_t uStep /* int bAsc */ );
 
 #endif /* _ST_DARTS_H_ */

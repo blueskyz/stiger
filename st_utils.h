@@ -26,28 +26,25 @@
 #define MAX_PATH 1024
 #endif
 
-#define stDetail(preMsg, logMsgFmt, args...)				\
-  {									\
-    char buf[MAX_PATH];							\
+#define stDetail(logMsgFmt, args...)				\
+  do{									\
     char logBuf[MAX_PATH];							\
-    memset(buf, 0, sizeof(buf));					\
-    snprintf(buf, MAX_PATH-1, "%s %s\n", preMsg, logMsgFmt); \
-    buf[MAX_PATH-1] = '\0';						\
-    snprintf(logBuf, MAX_PATH-1, buf, ##args);						\
-    logBuf[MAX_PATH-1] = '\0';						\
-    printf(logBuf);						\
-    stLogToFile(logBuf, strlen(logBuf));						\
+    int size = snprintf(logBuf, MAX_PATH-1, logMsgFmt "\n", ##args); \
+    printf("%s", logBuf);						\
+    stLogToFile(logBuf, size);						\
     fflush(stdout);							\
-  }									\
+  }while(0)
 
-#define stLog(logMsgFmt, args...) stDetail("[LOG]", logMsgFmt, ##args)
-#define stErr(logMsgFmt, args...) stDetail("[ERROR]", logMsgFmt, ##args)
+#define stLog(logMsgFmt, args...) stDetail("[LOG]" logMsgFmt, ##args)
+#define stErr(logMsgFmt, args...) stDetail("[ERROR]" logMsgFmt, ##args)
 
 #ifndef DEBUG
 #define stDebug(logMsgFmt, args...)
 #else
 #define stDebug(logMsgFmt, args...) stDetail("[DEBUG]", logMsgFmt, ##args)
 #endif
+
+#define min(x,y) ((x)<(y)?(x):(y))
 
 // code method
 int stUTF8Decode(BYTE** pBuf);

@@ -9,9 +9,17 @@
  */
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
+
+#ifndef __USE_MISC
+#define __USE_MISC
+#endif
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "st_utils.h"
 #include "st_darray.h"
@@ -29,6 +37,7 @@ struct st_darts
   uint32_t uRoot;
   st_darray* base;
   st_darray* check;
+  uint32_t uMmapSize;
   int32_t subCodeSize;
   int32_t subCode[g_s_subSize];
 };
@@ -80,7 +89,7 @@ int stDartsFindBase(st_darts* handler, int s, uint16_t uCode)
     for ( ; j < n ; ++j ){
       int tmp = i + subCode[j] - minCode;
       if (pCheck[tmp] >= 0 || pBase[tmp].base >= 0)
-	break;
+		  break;
     }
     // stDebug("-- pCheck i=%d j=%d", i, j);
     if (j == n){
@@ -135,7 +144,7 @@ int stDartsRelocate(st_darts* handler, int s, unsigned int uNewBase)
 // interface
 /** 
  * @brief create double array trie
- * 
+ * @param baseArrayLen init darray for base and check
  * 
  * @return not null: succ, null: fail
  */
@@ -195,6 +204,20 @@ int stDartsFree(st_darts* handler)
   }
   if (NULL != handler->base){
     free(handler->base);
+  }
+  free(handler);
+  return 0;
+}
+
+
+int stDartsFreeMmap(st_darts* handler)
+{
+  if (NULL == handler || handler->uMagic < g_s_uDartsMagicBase){
+    return -1;
+  }
+  if (handler->uMmapSize != 0){
+	  char* pMmap = ((char*)handler->base) - 16 - 4;
+	  munmap((void*)pMmap, handler->uMmapSize);
   }
   free(handler);
   return 0;
@@ -346,23 +369,74 @@ st_darts* stDartsLoad(const char* filePath)
   return NULL;
 }
 
+st_darts* stDartsLoadMmap(const char* filePath)
+{
+#ifdef __linux__
+  stLog("load darts from %s, type mmap.", filePath);
+  if (NULL == filePath){
+    stErr("load darts fail, filePath is empty.");
+    return NULL;
+  }
+  int fd = open(filePath, O_RDONLY, S_IRUSR);
+  if (-1 == fd){
+    stErr("load darts, open file %s fail, %s", filePath, strerror(errno));
+    return NULL;
+  }
+  struct stat sb;
+  if (fstat(fd, &sb) == -1){
+    stErr("load darts fail, fstat");
+    goto fail;
+  }
+  char* addr = mmap(NULL, sb.st_size, PROT_READ, MAP_LOCKED | MAP_PRIVATE, fd, 0);
+  if (addr == MAP_FAILED){
+    stErr("load darts fail, mmap %s", strerror(errno));
+    goto fail;
+  }
+  close(fd);
+
+  struct st_darts* handler = (st_darts*)malloc(sizeof(st_darts));
+  if (NULL == handler){
+    stErr("load darts fail, new darts err.");
+    goto fail;
+  }
+  uint32_t uOffset = 0;
+  memcpy(handler, addr, sizeof(uint32_t) << 2); 
+  handler->base = (struct darray*)(addr + 16 + 4);
+  memcpy(&uOffset, addr + 16, sizeof(uint32_t));
+  handler->check = (struct darray*)(addr + 16 + 8 + uOffset);
+  return handler;
+
+ fail:
+  close(fd);
+#else
+  stErr("the platform is not linux, not support mmap.");
+#endif
+  return NULL;
+}
+
 /** 
- * @brief create search state
+ * @brief init search state
  * 
  * @param handler 
  * 
  * @return not null: succ/the pointer for state, null: fail
  */
-st_darts_state* stDartsStateNew(st_darts* handler)
+st_darts_state* stDartsStateInit(st_darts* handler, 
+				st_darts_state* pDartsState,
+				const char* start,
+				const char* end)
 {
-  st_darts_state* pDartsState = (st_darts_state*)malloc(sizeof(st_darts_state));
   if (NULL == pDartsState){
     return NULL;
   }
-  memset(pDartsState, 0, sizeof(st_darts_state));
   pDartsState->uMagic = handler->uMagic;
   pDartsState->state = eds_begin;
   pDartsState->uSState = 0;
+  pDartsState->start = start;
+  pDartsState->end = end;
+  pDartsState->uHasDecWords = 0;
+  pDartsState->uHasProcWords = 0;
+  pDartsState->uCurWordPos = 0;
   return pDartsState;
 }
 
@@ -424,7 +498,7 @@ int stDartsFindNext(st_darts* handler, st_darts_state* state)
     }
     else {
       state->state = eds_end;
-      return 0;
+      return -1;
     }
     uTState = abs(pBase[s].base) + state->uKey;
     stDebug("s=%u, t=%u, Base[s]=%d, Check[t]=%d, Base[t]=%d",
@@ -433,12 +507,13 @@ int stDartsFindNext(st_darts* handler, st_darts_state* state)
       state->uSState = uTState;
       state->state = eds_mid;
       if (pBase[uTState].base <= 0){
-	state->state |= eds_has_value;
-	state->uValue = pBase[uTState].uValue;
+		  state->state |= eds_has_value;
+		  state->uValue = pBase[uTState].uValue;
       }
     }
     else {
       state->state = eds_end;
+	  return -1;
     }
     return 0;
   }
@@ -569,7 +644,7 @@ int stDartsPut(st_darts* handler,
  * 
  * @return 0: succ, -1: fail
  */
-int stCutWord(st_darts* handler,
+int stDartsCutWord(st_darts* handler,
 	      st_darts_state* dState,
 	      const char* str,
 	      uint32_t* wordIdArr,
@@ -647,11 +722,6 @@ int stCutWord(st_darts* handler,
   return 0;
 }
 
-struct term {
-    uint32_t uCode;
-    const char* pWord;
-    const char* pWordEnd;
-};
 
 /** 
  * @brief automatic segmentation model
@@ -664,22 +734,116 @@ struct term {
  * 
  * @return 0: succ, -1: fail
  */
-int stCutWordByte(st_darts* handler,
+int stDartsNextWord(st_darts* handler,
+		st_darts_state* dState,
+		struct st_wordInfo* pWordInfo)
+{
+  assert(NULL != handler && NULL != dState && NULL != pWordInfo);
+  const char*  str = NULL;
+  if (dState->uHasDecWords == 0){
+    str = dState->start;
+  }
+  else {
+    str = dState->cacheCode[(dState->uHasDecWords - 1)& MAX_ZH_WORD_MASK].pWordEnd;
+  }
+  const char* end = dState->end;
+  if (str == NULL || end < str){
+	stErr("str error. str=%p,end=%p", str, end);
+	return -1;
+  }
+  while(1){
+    // decode to cache
+    for ( ; dState->uHasProcWords + MAX_ZH_WORD_LEN > dState->uHasDecWords 
+		    && str < end ; ){
+      int iCode = stUTF8Decode((BYTE**)&str);
+      if (0 == iCode){
+        break;
+      }
+      if (iCode == -1){
+        return -1;
+      }
+      else {
+        uint32_t uIdx = dState->uHasDecWords & MAX_ZH_WORD_MASK;
+        dState->cacheCode[uIdx].uCode = iCode;
+        dState->cacheCode[uIdx].pWordEnd = str;
+		++dState->uHasDecWords;
+      }
+    }
+    // match
+    for ( ; dState->uCurWordPos < dState->uHasDecWords ; ++dState->uCurWordPos){
+      uint32_t i = dState->uCurWordPos;
+      stDebug("i=%u, hasProcWords=%u, hasDecWords=%u", 
+		i, dState->uHasProcWords, dState->uHasDecWords);
+	  struct term* pTerm = &dState->cacheCode[i & MAX_ZH_WORD_MASK];
+
+	  ST_DARTS_STATE_SET_KEY(dState, pTerm->uCode);
+	  int nFind = stDartsFindNext(handler, dState);
+	  if (nFind < 0){
+		  stDebug("can't find icode=%u", pTerm->uCode);
+		  if (ST_DARTS_STATE_END(dState)){
+			  stDebug("End");
+		  }
+		  break;
+	  }
+	  else if (ST_DARTS_STATE_HAS_VALUE(dState)){
+		  // find word
+		  pWordInfo->wordId = ST_DARTS_STATE_VALUE(dState);
+		  pWordInfo->pWord = dState->start;
+		  pWordInfo->wordLen = pTerm->pWordEnd - pWordInfo->pWord;
+		  stDebug("find word=%s, wordId=%d, i=%u",
+				  dState->start, ST_DARTS_STATE_VALUE(dState), i);
+		  ++dState->uCurWordPos;
+		  return 1;
+	  }
+	}
+	dState->start = dState->cacheCode[dState->uHasProcWords & MAX_ZH_WORD_MASK].pWordEnd;
+	++dState->uHasProcWords;
+	dState->uCurWordPos = dState->uHasProcWords;
+	stDartsStateReset(handler, dState);
+	if (dState->uHasProcWords == dState->uHasDecWords ){
+		break;
+	}
+  }
+
+  return 0;
+}
+
+
+/** 
+ * @brief automatic segmentation model
+ * 
+ * @param str the string length = uLen, the str length < 1024
+ * @param wordIdArr wordId list, array length = 2 * uLen
+ * @param posArr the word position, array length = 2 * uLen
+ * @param uLen
+ * @param bAsc 
+ * 
+ * @return 0: succ, -1: fail
+ */
+int stDartsCutWordByte(st_darts* handler,
 		st_darts_state* dState,
 		const char* str,
-		const char** wordArr,
-		uint32_t* wordLenArr,
-		uint32_t* pLen,
+		const char* end,
+		struct st_wordInfo* pWordInfo,
+		uint32_t* pWordCount,
 		uint32_t uStep /* int bAsc */ )
 {
-  assert(NULL != str && 0 != *pLen && 0 != uStep);
+  assert(NULL != str && 0 != *pWordCount && 0 != uStep);
+  if (*pWordCount < ST_MAGIC_SENTENCE){
+	stErr("WordInfo size too small. must >= %d", ST_MAGIC_SENTENCE);
+	return -1;
+  }
   struct term termCodeArr[ST_MAGIC_SENTENCE] = { {0, 0, 0} };
   int hasValue[ST_MAGIC_SENTENCE][16];
   int i = 0;
   const char* srcStr = str;
   const char* preStr = str;
   memset( hasValue, 0, sizeof(hasValue));
+  *pWordCount= 0;
   for (i = 0; i < ST_MAGIC_SENTENCE ; ++i){
+    if (str == end){
+	break;
+    }
     int iCode = stUTF8Decode((BYTE**)&str);
     if (0 == iCode){
       break;
@@ -727,16 +891,18 @@ int stCutWordByte(st_darts* handler,
           unsigned int uLen = termCodeArr[k].pWordEnd - termCodeArr[j].pWord;
 	  unsigned int uOff = termCodeArr[j].pWord - srcStr;
 	  if (hasValue[uOff][uLen] == 0){
-		  stDebug("zsz : ------ uOff=%d, uLen=%d, havValue=%d", uOff, uLen, hasValue[uOff][uLen]);
+	    stDebug("hasValue map : uOff=%d, uLen=%d, havValue=%d", 
+		   uOff, uLen, hasValue[uOff][uLen]);
 	    hasValue[uOff][uLen] = 1;
-	    wordLenArr[nMatch] = uLen;
-	    wordArr[nMatch++] = termCodeArr[j].pWord;
+	    pWordInfo[nMatch].wordId = ST_DARTS_STATE_VALUE(dState);
+	    pWordInfo[nMatch].wordLen = uLen;
+	    pWordInfo[nMatch++].pWord = termCodeArr[j].pWord;
 	  }
 	}
       }
     }
     --r;
   }
-  *pLen = nMatch;
+  *pWordCount = nMatch;
   return 0;
 }
