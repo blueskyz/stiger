@@ -23,12 +23,13 @@ typedef enum { eds_begin = 0x01,
 
 struct term {
     uint32_t uCode;
-    const char* pWord;
-    const char* pWordEnd;
+    char* pWord;
+    char* pWordEnd;
 };
 
-#define MAX_ZH_WORD_LEN 0x10
-#define MAX_ZH_WORD_MASK (MAX_ZH_WORD_LEN - 1)
+#define MAX_WORD_LEN 0x20
+#define MAX_WORD_CACHE_LEN 0x100
+#define MAX_WORD_CACHE_MASK (MAX_WORD_CACHE_LEN - 1)
 struct st_darts_state
 {
   unsigned int uMagic;
@@ -36,18 +37,18 @@ struct st_darts_state
   unsigned int uValue;
   unsigned int uSState;
   int state;
-  const char* start;
-  const char* end;
+  char* start;
+  char* end;
   uint32_t uHasDecWords;
   uint32_t uHasProcWords;
   uint32_t uCurWordPos;
-  struct term cacheCode[MAX_ZH_WORD_LEN];
+  struct term cacheCode[MAX_WORD_CACHE_LEN];
 };
 
 struct st_wordInfo {
   uint32_t wordId;
   uint32_t wordLen;
-  const char* pWord;
+  char* pWord;
 };
 
 #define ST_DARTS_STATE_CMP(st_state, state_value) \
@@ -115,8 +116,8 @@ st_darts* stDartsLoadMmap(const char* filePath);
  */
 st_darts_state* stDartsStateInit(st_darts* handler, 
 				st_darts_state* pDartsState,
-				const char* start,
-				const char* end);
+				char* start,
+				char* end);
 
 /** 
  * @brief destroy state object
@@ -169,8 +170,8 @@ int stDartsNextWord(st_darts* handler,
 
 int stDartsCutWordByte(st_darts* handler,
 		st_darts_state* dState,
-		const char* str,
-		const char* end,
+		char* str,
+		char* end,
 		struct st_wordInfo* pWordInfo,
 		uint32_t* pWordCount,
 		uint32_t uStep /* int bAsc */ );

@@ -55,8 +55,12 @@ int stConvertCode(const char* srcCode,
 		  char* dest,
 		  size_t destLen);
 
+int stPrintFilterSymbol();
+int stFilterSymbol(int nCode);
+void stToLower(char* pStr, uint32_t uLen);
+
 // log file
-void stLogToFile();
+void stLogToFile(const char* content, unsigned int uLen);
 
 // time method
 typedef enum { ST_TIMER_SEC, ST_TIMER_MILLI_SEC, ST_TIMER_MICRO_SEC } st_timer;

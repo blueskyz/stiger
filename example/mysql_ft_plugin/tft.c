@@ -51,7 +51,7 @@ static long number_of_calls= 0; /* for SHOW STATUS, see below */
 */
 
 
-static char* g_s_dictFile="/opt/mysql/dict_chs.dic";
+static char* g_s_dictFile="/home/dev/work/ppr/tft/dict_chs.dic";
 static st_darts* g_s_pDarts = NULL;
 
 /*
@@ -212,36 +212,31 @@ static int tft_parse(MYSQL_FTPARSER_PARAM *param)
 
   st_timer stTimerType = ST_TIMER_MICRO_SEC;
   char* start = param->doc;
-  char* end = param->doc;
   char* docend = param->doc + param->length;
   struct st_wordInfo wordInfo[c_uWordsCount] = { { 0, 0, 0 } };
   // param->flags = MYSQL_FTFLAGS_NEED_COPY;
 
   st_darts_state dState;
+  stDartsStateInit(g_s_pDarts, &dState, start, docend);
   char output[1024] = {0};
   memcpy(output, param->doc, min(param->length, 1024));
   output[1024] = '\0';
   
+  stLog("input=%s, paramlen=%d", output, param->length);
   // stConvertCode(encode, "utf-8", input, strlen(input), output, MAX_PATH);
-  stDartsStateInit(g_s_pDarts, &dState, start, docend);
-  long long queryBeginTime = stTimer(stTimerType);
   uint32_t uWordsCount = 0;
-  while (uWordsCount < c_uWordsCount 
+  long long queryBeginTime = stTimer(stTimerType);
+  while(uWordsCount < c_uWordsCount 
 		  && stDartsNextWord(g_s_pDarts, &dState, &wordInfo[uWordsCount])){
-	  ++uWordsCount;
+	++uWordsCount;
   }
   long long queryEndTime = stTimer(stTimerType);
-  stLog("input=%s, paramlen=%d, result=%u, cost time=%lldus", 
-		  output,
-		  param->length,
-		  uWordsCount, 
-		  queryEndTime - queryBeginTime);
+  stLog("result=%u, cost time=%lldus", uWordsCount, queryEndTime - queryBeginTime);
   if(uWordsCount == 0){
     tft_parse_en(param);
   }
 
-  char outWordId[32] = { 0 };
-  for (int i = uWordsCount - 1; i >= 0; --i){
+  for (int i = 0; i < uWordsCount; ++i){
     add_word(param, wordInfo[i].pWord, wordInfo[i].wordLen);
   }
 

@@ -21,7 +21,7 @@
 
 static st_darts* g_s_pDarts = NULL;
 
-unsigned int findToken(st_darts* handler, const char* str, unsigned int uLen)
+unsigned int findToken(st_darts* handler, char* str, unsigned int uLen)
 {
 	st_darts_state state;
 	stDartsStateInit(handler, &state, str, str + uLen);
@@ -138,7 +138,7 @@ void testMode(st_darts* pDarts, char* encode)
 	stDebug("str=%s, len=%d", str, strlen(str));
 	findToken(pDarts, str, sizeof(str));
 	long long queryEndTime = stTimer(stTimerType);
-	stLog("query word=%s, len=%d, time=%lld\n",
+	stLog("query word=%s, len=%zu, time=%lld\n",
 			str, sizeof(str), queryEndTime - queryBeginTime);
 
 
@@ -150,9 +150,9 @@ void testMode(st_darts* pDarts, char* encode)
 	fflush(stdout);
 	while (fgets(input, MAX_PATH, stdin)){
 		input[strlen(input)-1] = '\0';
-		stDebug("input=%s, len=%d", input, strlen(input));
+		stDebug("input=%s, len=%zu", input, strlen(input));
 		stConvertCode(encode, "utf-8", input, strlen(input), output, MAX_PATH);
-		stDebug("outbuf=%s, len=%d", output, strlen(output));
+		stDebug("outbuf=%s, len=%zu", output, strlen(output));
 		findToken(pDarts, output, strlen(output));
 
 		printf("Plz input # ");
@@ -182,7 +182,7 @@ void testModeCutWord(st_darts* pDarts, char* encode)
 			continue;
 		}
 		input[strlen(input)-1] = '\0';
-		stLog("input=%s, len=%d", input, strlen(input));
+		stLog("input=%s, len=%zu", input, strlen(input));
 		stConvertCode(encode, "utf-8", input, strlen(input), output, MAX_PATH);
 		uint32_t uLen = strlen(output);
 		stLog("outbuf=%s, len=%u", output, uLen);
@@ -228,6 +228,10 @@ void testModeCutWord(st_darts* pDarts, char* encode)
 	}
 }
 
+#ifdef MAX_PATH
+#undef MAX_PATH
+#define MAX_PATH (1024<<4)
+#endif
 void testModeCutWordForByte(st_darts* pDarts, char* encode)
 {
 	st_timer stTimerType = ST_TIMER_MICRO_SEC;
@@ -248,7 +252,7 @@ void testModeCutWordForByte(st_darts* pDarts, char* encode)
 			continue;
 		}
 		input[strlen(input)-1] = '\0';
-		stLog("input=%s, len=%d", input, strlen(input));
+		stLog("input=%s, len=%zu", input, strlen(input));
 		stConvertCode(encode, "utf-8", input, strlen(input), output, MAX_PATH);
 		uint32_t uLen = strlen(output);
 		stLog("outbuf=%s, len=%u", output, uLen);
@@ -291,7 +295,7 @@ void testModeCutWordComplete(st_darts* pDarts, char* encode)
 			continue;
 		}
 		input[strlen(input)-1] = '\0';
-		stLog("input=%s, len=%d", input, strlen(input));
+		stLog("input=%s, len=%zu", input, strlen(input));
 		stConvertCode(encode, "utf-8", input, strlen(input), output, MAX_PATH);
 		uint32_t uLen = strlen(output);
 		stLog("outbuf=%s, len=%u", output, uLen);
@@ -305,7 +309,7 @@ void testModeCutWordComplete(st_darts* pDarts, char* encode)
 		long long queryEndTime = stTimer(stTimerType);
 		stLog("result=%u, cost time=%lldus", uLen, queryEndTime - queryBeginTime);
 
-		for (int i = uLen - 1; i >= 0; --i){
+		for (int i = 0; i < uLen ; ++i){
 			memcpy(outWord, wordInfo[i].pWord, wordInfo[i].wordLen);
 			outWord[wordInfo[i].wordLen] = '\0';
 			stLog("query i=%d, word=%s, wordId=%d, len=%u",
@@ -325,7 +329,8 @@ void usage()
 			"	-p: mmap dictionary from darts file\n"
 			"  task:\n"
 			"	-c file: create darts file from memory\n"
-			"	-t mode: test mode [0. test word  1. test cut word 2. test cut word for byte 3.]\n"
+			"	-t mode: test mode [0. test word  1. test cut word "
+			"2. test cut word for byte 3. new cut word, 4. print split symbol]\n"
 			"	-h: help\n"
 			"  option:\n"
 			"	-n: <dictMode = -s> word count, default 10\n"
@@ -394,7 +399,8 @@ int main(int argc, char *argv[])
 				if (nModeTest != 0 
 						&& nModeTest != 1
 						&& nModeTest != 2
-						&& nModeTest != 3){
+						&& nModeTest != 3
+						&& nModeTest != 4){
 					stErr("error test mode %d", nModeTest);
 					usage();
 					return -1;
@@ -466,6 +472,8 @@ int main(int argc, char *argv[])
 			testModeCutWordForByte(g_s_pDarts, encode[nEncodeIndex]);
 		if (nModeTest == 3)
 			testModeCutWordComplete(g_s_pDarts, encode[nEncodeIndex]);
+		if (nModeTest == 4)
+			stPrintFilterSymbol();
 		else {
 			usage();
 			return -1;

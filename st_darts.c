@@ -401,9 +401,9 @@ st_darts* stDartsLoadMmap(const char* filePath)
   }
   uint32_t uOffset = 0;
   memcpy(handler, addr, sizeof(uint32_t) << 2); 
-  handler->base = (struct darray*)(addr + 16 + 4);
+  handler->base = (st_darray*)(addr + 16 + 4);
   memcpy(&uOffset, addr + 16, sizeof(uint32_t));
-  handler->check = (struct darray*)(addr + 16 + 8 + uOffset);
+  handler->check = (st_darray*)(addr + 16 + 8 + uOffset);
   return handler;
 
  fail:
@@ -423,8 +423,8 @@ st_darts* stDartsLoadMmap(const char* filePath)
  */
 st_darts_state* stDartsStateInit(st_darts* handler, 
 				st_darts_state* pDartsState,
-				const char* start,
-				const char* end)
+				char* start,
+				char* end)
 {
   if (NULL == pDartsState){
     return NULL;
@@ -739,68 +739,108 @@ int stDartsNextWord(st_darts* handler,
 		struct st_wordInfo* pWordInfo)
 {
   assert(NULL != handler && NULL != dState && NULL != pWordInfo);
-  const char*  str = NULL;
-  if (dState->uHasDecWords == 0){
-    str = dState->start;
+  char*  str = dState->start;
+  if (dState->uHasDecWords != 0){
+    str = dState->cacheCode[(dState->uHasDecWords - 1)& MAX_WORD_CACHE_MASK].pWordEnd;
   }
-  else {
-    str = dState->cacheCode[(dState->uHasDecWords - 1)& MAX_ZH_WORD_MASK].pWordEnd;
-  }
-  const char* end = dState->end;
+  char* end = dState->end;
   if (str == NULL || end < str){
 	stErr("str error. str=%p,end=%p", str, end);
 	return -1;
   }
+  uint32_t uEnglish = 0;
   while(1){
     // decode to cache
-    for ( ; dState->uHasProcWords + MAX_ZH_WORD_LEN > dState->uHasDecWords 
-		    && str < end ; ){
-      int iCode = stUTF8Decode((BYTE**)&str);
-      if (0 == iCode){
-        break;
-      }
-      if (iCode == -1){
-        return -1;
-      }
-      else {
-        uint32_t uIdx = dState->uHasDecWords & MAX_ZH_WORD_MASK;
-        dState->cacheCode[uIdx].uCode = iCode;
-        dState->cacheCode[uIdx].pWordEnd = str;
-		++dState->uHasDecWords;
-      }
+    if (dState->uHasProcWords + MAX_WORD_LEN > dState->uHasDecWords && str < end){
+	  for ( ; dState->uHasProcWords + MAX_WORD_CACHE_LEN > dState->uHasDecWords 
+		  && str < end ; ){
+		int iCode = stUTF8Decode((BYTE**)&str);
+		switch(iCode){
+		  case -1:
+			return -1;
+		  case 0:
+			break;
+		  default:
+			{
+			  uint32_t uIdx = dState->uHasDecWords & MAX_WORD_CACHE_MASK;
+			  dState->cacheCode[uIdx].uCode = iCode;
+			  dState->cacheCode[uIdx].pWordEnd = str;
+			  ++dState->uHasDecWords;
+			}
+		}
+	  }
     }
     // match
     for ( ; dState->uCurWordPos < dState->uHasDecWords ; ++dState->uCurWordPos){
       uint32_t i = dState->uCurWordPos;
       stDebug("i=%u, hasProcWords=%u, hasDecWords=%u", 
 		i, dState->uHasProcWords, dState->uHasDecWords);
-	  struct term* pTerm = &dState->cacheCode[i & MAX_ZH_WORD_MASK];
+	  struct term* pTerm = &dState->cacheCode[i & MAX_WORD_CACHE_MASK];
 
-	  ST_DARTS_STATE_SET_KEY(dState, pTerm->uCode);
-	  int nFind = stDartsFindNext(handler, dState);
-	  if (nFind < 0){
+	  int nFilter = stFilterSymbol(pTerm->uCode);
+	  if (nFilter == 0){ // 英文分词
+		if (uEnglish || dState->uCurWordPos == dState->uHasProcWords){
+		  ++uEnglish;
+		}
+		else {
+		  break;
+		}
+	  }
+	  else { // 中文分词
+		if (uEnglish){ // find 英文分词
+		  pWordInfo->wordId = 0;
+		  pWordInfo->pWord = dState->start;
+		  stToLower(pWordInfo->pWord, uEnglish);
+		  pWordInfo->wordLen = uEnglish;
+		  stDebug("find english word=%s, uLen=%d, i=%u", dState->start, uEnglish, i);
+		  dState->start += uEnglish;
+		  dState->uHasProcWords += uEnglish;
+		  dState->uCurWordPos = dState->uHasProcWords;
+		  uEnglish = 0;
+		  return 1;
+		}
+		if (nFilter == -1){ // 是分隔符号提前结束
+		  break;
+		}
+		uEnglish = 0;
+		ST_DARTS_STATE_SET_KEY(dState, pTerm->uCode);
+		int nFind = stDartsFindNext(handler, dState);
+		if (nFind < 0){
 		  stDebug("can't find icode=%u", pTerm->uCode);
 		  if (ST_DARTS_STATE_END(dState)){
-			  stDebug("End");
+			stDebug("End");
 		  }
 		  break;
-	  }
-	  else if (ST_DARTS_STATE_HAS_VALUE(dState)){
+		}
+		else if (ST_DARTS_STATE_HAS_VALUE(dState)){
 		  // find word
 		  pWordInfo->wordId = ST_DARTS_STATE_VALUE(dState);
 		  pWordInfo->pWord = dState->start;
-		  pWordInfo->wordLen = pTerm->pWordEnd - pWordInfo->pWord;
+		  pWordInfo->wordLen = pTerm->pWordEnd - dState->start;
 		  stDebug("find word=%s, wordId=%d, i=%u",
-				  dState->start, ST_DARTS_STATE_VALUE(dState), i);
+			  dState->start, ST_DARTS_STATE_VALUE(dState), i);
 		  ++dState->uCurWordPos;
 		  return 1;
+		}
 	  }
 	}
-	dState->start = dState->cacheCode[dState->uHasProcWords & MAX_ZH_WORD_MASK].pWordEnd;
+	if (uEnglish){ // find 最后的英文分词
+	  pWordInfo->wordId = 0;
+	  pWordInfo->pWord = dState->start;
+	  stToLower(pWordInfo->pWord, uEnglish);
+	  pWordInfo->wordLen = uEnglish;
+	  stDebug("find english word=%s, uLen=%d, i=%u", dState->start, uEnglish, i);
+	  dState->start += uEnglish;
+	  dState->uHasProcWords += uEnglish;
+	  dState->uCurWordPos = dState->uHasProcWords;
+	  uEnglish = 0;
+	  return 1;
+	}
+	dState->start = dState->cacheCode[dState->uHasProcWords & MAX_WORD_CACHE_MASK].pWordEnd;
 	++dState->uHasProcWords;
 	dState->uCurWordPos = dState->uHasProcWords;
 	stDartsStateReset(handler, dState);
-	if (dState->uHasProcWords == dState->uHasDecWords ){
+	if (dState->uHasProcWords >= dState->uHasDecWords ){
 		break;
 	}
   }
@@ -822,8 +862,8 @@ int stDartsNextWord(st_darts* handler,
  */
 int stDartsCutWordByte(st_darts* handler,
 		st_darts_state* dState,
-		const char* str,
-		const char* end,
+		char* str,
+		char* end,
 		struct st_wordInfo* pWordInfo,
 		uint32_t* pWordCount,
 		uint32_t uStep /* int bAsc */ )
@@ -836,8 +876,8 @@ int stDartsCutWordByte(st_darts* handler,
   struct term termCodeArr[ST_MAGIC_SENTENCE] = { {0, 0, 0} };
   int hasValue[ST_MAGIC_SENTENCE][16];
   int i = 0;
-  const char* srcStr = str;
-  const char* preStr = str;
+  char* srcStr = str;
+  char* preStr = str;
   memset( hasValue, 0, sizeof(hasValue));
   *pWordCount= 0;
   for (i = 0; i < ST_MAGIC_SENTENCE ; ++i){
