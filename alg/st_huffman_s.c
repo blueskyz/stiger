@@ -20,16 +20,15 @@ struct st_hfms_node{
   st_hfms_tree_type type;
   st_hfms_node* parent;
   uint32_t count; // count of all child
-  uint32_t uLevel;
-  void* child[2]; // 0: left, 1: right
+  uint32_t uBitCount; // level == bit length
+  st_hfms_node* child[2]; // 0: left, 1: right
 };
 
 typedef struct {
   st_hfms_tree_type type;
   st_hfms_node* parent;
   uint32_t count; // weight 
-  uint32_t uLevel;
-  uint32_t uBitCount;
+  uint32_t uBitCount; // level == bit length
   BYTE* bitCode;
 } st_hfms_leaf;
 
@@ -85,7 +84,6 @@ static int stHfmSCreateTree(st_hfms* handler)
 	if (leaf->count == 0){
 	  leaf->type = ST_HFMS_TREE_LEAF;
 	  leaf->parent = NULL;
-	  leaf->uLevel = 0;
 	  leaf->bitCode = NULL;
 	  leaf->uBitCount = 0;
 	}
@@ -141,21 +139,23 @@ static int stHfmSCreateTree(st_hfms* handler)
 	if(0 == u2){
 	  pUnit[++u2] = stHeapPop(heapHandler);
 	}
-	if (NULL == pUnit[u2] && 0 != uNodeIdx){ // u2 == 1
+	if (NULL == pUnit[u2]){ // u2 == 1
 	  // end
 	  stDebug("find tree root");
 	  handler->tree = (st_hfms_node*)pUnit[0];
+	  handler->tree->uBitCount = 0;
 	  break;
 	}
 	else{
 	  // process and push back
 	  st_hfms_node* pNode = &handler->node[uNodeIdx];
+	  pUnit[0]->parent = pNode;
+	  pUnit[1]->parent = pNode;
 	  pNode->type = ST_HFMS_TREE_NODE;
 	  pNode->parent = NULL;
-	  pNode->uLevel = 0;
 	  pNode->count = pUnit[0]->count + pUnit[1]->count;
-	  pNode->child[0] = pUnit[0];
-	  pNode->child[1] = pUnit[1];
+	  pNode->child[0] = (st_hfms_node*)pUnit[0];
+	  pNode->child[1] = (st_hfms_node*)pUnit[1];
 	  stHeapPush(heapHandler, pNode);
 
 	  // debug log
@@ -251,25 +251,33 @@ int stHfmSFree(st_hfms* handler)
 
 int stHfmSDebug(st_hfms* handler)
 {
-  stLog("print tree node");
-  uint32_t uDepth = 0;
+  static const char* sDir[] = {"left", "right"};
+  uint32_t uDir = 0;
   const uint32_t uLeft = 0;
   const uint32_t uRight = 1;
   st_hfms_node* node = handler->tree;
+  stDebug("print tree node root=%p", node);
   while(NULL != node){
 	if (node->type == ST_HFMS_TREE_NODE){
-	  if (NULL != node->child[uLeft]){
-		node = node->child[uLeft];
-	  }
-	  else if (NULL != node->child[uRight]){
-		node = node->child[uRight];
-	  }
-	}
-	else if (node->type == ST_HFMS_TREE_LEAF){
-	}
-	else {
-	  stErr("error tree node");
-	  return -1;
+		if (0 == node->child[uLeft]->uBitCount){
+			uDir = uLeft;
+		}
+		else if (0 == node->child[uRight]->uBitCount){
+			uDir = uRight;
+		}
+		else {
+			node = node->parent;
+			continue;
+		}
+		node = node->child[uDir];
+		node->uBitCount = node->parent->uBitCount + 1;
+		if (node->type == ST_HFMS_TREE_LEAF){
+			stDebug("tree %s leaf=%p", sDir[uDir], node);
+			node = node->parent;
+		}
+		else {
+			stDebug("tree %s node=%p", sDir[uDir], node);
+		}
 	}
   }
 
