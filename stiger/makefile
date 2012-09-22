@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-Wall -fPIC -I../alg/ -std=c99 -O2 #-DDEBUG
-LDFLAGS=-L./ -L../alg/lib -lm
+LDFLAGS=-L./ -L../lib -lm
 
 SOURCE_TOOLS=st_darts.c
 OBJS=$(patsubst %.c,%.o,$(SOURCE_TOOLS))
@@ -12,7 +12,7 @@ target: st_tools
 st_tools: $(OBJS)
 	ar rcs libstiger.a $^
 	$(CC) $(CFLAGS) -c st_tools.c -o st_tools.o
-	$(CC) $(CFLAGS) st_tools.o $(LDFLAGS) -lstiger -lstbase -lm -o $@
+	$(CC) $(CFLAGS) st_tools.o -lstiger -lstbasealg $(LDFLAGS) -o $@
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

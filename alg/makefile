@@ -13,11 +13,13 @@ target: ready st_test
 ready:
 	test -d obj || mkdir -pv obj
 	test -d lib || mkdir -pv lib
+	test -d ../lib || mkdir -pv ../lib
 
 st_test: $(OBJS)
-	ar rcs lib/libstbase.a $(LIBOBJS)
+	ar rcs lib/libstbasealg.a $(LIBOBJS)
+	cp -v -f lib/* ../lib/
 	$(CC) $(CFLAGS) -c st_test.c -o obj/st_test.o
-	$(CC) $(CFLAGS) obj/st_test.o -lstbase $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) obj/st_test.o -lstbasealg $(LDFLAGS) -o $@
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o obj/$@
