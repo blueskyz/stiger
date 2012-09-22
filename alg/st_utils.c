@@ -106,16 +106,14 @@ void unicodeToUtf16(int16_t* iCode, unsigned int uSize)
 
 void stLogToFile(const char* content, unsigned int uLen)
 {
-  int log = open("/var/log/mysql/mysql.tft.log", 
-		  O_WRONLY | O_APPEND | O_CREAT,
-		  S_IRWXU);
+  int log = open("./log/st.log", O_WRONLY | O_APPEND | O_CREAT, S_IRWXU);
   write(log, content, uLen);
   close(log);
 }
 
 // ------------------------------------------------------------
 // timer
-long long stTimer(st_timer stTimeType)
+inline long long stTimer(st_timer stTimeType)
 {
   if (stTimeType < ST_TIMER_SEC || stTimeType > ST_TIMER_MICRO_SEC){
     return -1;

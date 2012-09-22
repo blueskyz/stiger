@@ -5,11 +5,12 @@
  * 
  * @brief  dynamic array interface
  * 
- * 
  */
 
 #ifndef _ST_DARRAY_H_
 #define _ST_DARRAY_H_
+
+#include <stdint.h>
 
 typedef struct st_darray st_darray;
 
@@ -61,7 +62,9 @@ void* stDArrayPut(st_darray* handler, unsigned int index, void* elem);
  * @return length
  */
 uint32_t stDArrayLen(st_darray* handler);
+
 uint32_t stDArrayUnitSize(st_darray* handler);
+
 uint32_t stDArrayGetMemSize(st_darray* handler);
 
 /** 

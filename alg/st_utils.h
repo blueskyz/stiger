@@ -17,6 +17,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #ifndef BYTE
 #define BYTE unsigned char
@@ -36,12 +37,16 @@
   }while(0)
 
 #define stLog(logMsgFmt, args...) stDetail("[LOG]" logMsgFmt, ##args)
-#define stErr(logMsgFmt, args...) stDetail("[ERROR]" logMsgFmt, ##args)
+#define stErr(logMsgFmt, args...) \
+  do{ \
+	stDetail("[ERROR]" logMsgFmt, ##args); \
+	assert(0); \
+  }while(0)
 
 #ifndef DEBUG
 #define stDebug(logMsgFmt, args...)
 #else
-#define stDebug(logMsgFmt, args...) stDetail("[DEBUG]", logMsgFmt, ##args)
+#define stDebug(logMsgFmt, args...) stDetail("[DEBUG]" logMsgFmt, ##args)
 #endif
 
 #define min(x,y) ((x)<(y)?(x):(y))
@@ -56,7 +61,9 @@ int stConvertCode(const char* srcCode,
 		  size_t destLen);
 
 int stPrintFilterSymbol();
+
 int stFilterSymbol(int nCode);
+
 void stToLower(char* pStr, uint32_t uLen);
 
 // log file

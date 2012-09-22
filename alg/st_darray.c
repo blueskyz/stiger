@@ -90,7 +90,7 @@ st_darray* stDArrayResize(st_darray* handler, uint32_t arraySize)
  * 
  * @return elem
  */
-void* stDArrayPut(st_darray* handler, unsigned int index, void* elem)
+inline void* stDArrayPut(st_darray* handler, unsigned int index, void* elem)
 {
   assert(handler && handler->array);
   assert(index >= 0 && index < handler->length);
@@ -106,19 +106,19 @@ void* stDArrayPut(st_darray* handler, unsigned int index, void* elem)
  * 
  * @return length
  */
-uint32_t stDArrayLen(st_darray* handler)
+inline uint32_t stDArrayLen(st_darray* handler)
 {
   assert(handler && handler->array);
   return handler->length;
 }
 
-uint32_t stDArrayUnitSize(st_darray* handler)
+inline uint32_t stDArrayUnitSize(st_darray* handler)
 {
   assert(handler && handler->array);
   return handler->unitSize;
 }
 
-uint32_t stDArrayGetMemSize(st_darray* handler)
+inline uint32_t stDArrayGetMemSize(st_darray* handler)
 {
   assert(handler && handler->array);
   if (NULL == handler){
@@ -136,14 +136,14 @@ uint32_t stDArrayGetMemSize(st_darray* handler)
  * @return pointer for value
  * @note index must >=0 and < handler->length
  */
-void* stDArrayGet(st_darray* handler, unsigned int index)
+inline void* stDArrayGet(st_darray* handler, unsigned int index)
 {
   assert(handler && handler->array);
   assert(index >= 0 && index < handler->length);
   return handler->array + index * handler->unitSize;
 }
 
-void* stDArrayPointer(st_darray* handler)
+inline void* stDArrayPointer(st_darray* handler)
 {
   assert(handler && handler->array);
   return handler ? handler->array : NULL;
