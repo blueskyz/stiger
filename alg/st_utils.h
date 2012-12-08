@@ -36,20 +36,21 @@
     fflush(stdout);							\
   }while(0)
 
-#define stLog(logMsgFmt, args...) stDetail("[LOG]" logMsgFmt, ##args)
+#define stLog(logMsgFmt, args...) stDetail("[LOG] " logMsgFmt, ##args)
 #define stErr(logMsgFmt, args...) \
   do{ \
-	stDetail("[ERROR]" logMsgFmt, ##args); \
+	stDetail("[ERROR] " logMsgFmt, ##args); \
 	assert(0); \
   }while(0)
 
 #ifndef DEBUG
 #define stDebug(logMsgFmt, args...)
 #else
-#define stDebug(logMsgFmt, args...) stDetail("[DEBUG]" logMsgFmt, ##args)
+#define stDebug(logMsgFmt, args...) stDetail("[DEBUG] " logMsgFmt, ##args)
 #endif
 
 #define min(x,y) ((x)<(y)?(x):(y))
+#define max(x,y) ((x)>(y)?(x):(y))
 
 // code method
 int stUTF8Decode(BYTE** pBuf);

@@ -1,5 +1,6 @@
 CC=gcc
 CFLAGS=-g -Wall -fPIC -std=c99 -I../ -O -DDEBUG
+#LDFLAGS=-L./lib -lm -liconv
 LDFLAGS=-L./lib -lm
 
 SOURCE_TOOLS= st_heap.c st_huffman_s.c st_darray.c st_utils.c

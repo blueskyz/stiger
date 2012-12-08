@@ -16,7 +16,7 @@ st_hfms* stHfmSNew();
 /*
  * @brief encode byte
  */
-int stHfmSBuild(st_hfms* handler, BYTE* input, uint32_t uLen);
+int stHfmSBuild(st_hfms* handler, BYTE* input, uint32_t uLen, BYTE* output, uint32_t* outLen);
 
 /*
  * @brief output zip content
