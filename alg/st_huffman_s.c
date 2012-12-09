@@ -76,8 +76,12 @@ static int stHfmsByteUnitCmp(void* one, void* two)
 static int stHfmSCreateTree(st_hfms* handler)
 {
   // statistic
+  uint32_t maxCount = 0;
   BYTE* input = handler->_data;
   for (uint32_t i = 0 ; i < handler->_uLen ; ++i){
+	  if (input[i] > 128){
+		  stDebug("warning %u ascii=%u, %c", i, input[i], input[i]);
+	  }
 	st_hfms_leaf* leaf = &handler->_leaf[input[i]];
 	if (leaf->_count == 0){
 	  leaf->_type = ST_HFMS_TREE_LEAF;
@@ -85,7 +89,10 @@ static int stHfmSCreateTree(st_hfms* handler)
 	  leaf->_uBitCount = 0;
 	}
 	++leaf->_count;
+	maxCount = max(leaf->_count, maxCount);
   }
+  stDebug("maxCount %u", maxCount);
+
   // add eof tag
   handler->_leaf[CODE_SIZE-4]._type = ST_HFMS_TREE_LEAF;
   handler->_leaf[CODE_SIZE-4]._parent = NULL;
@@ -107,12 +114,21 @@ static int stHfmSCreateTree(st_hfms* handler)
 
   // statistic shang
   double shang = 0.0f;
+  uint32_t scale = 0;
   for (int i = 0 ; i < DATA_SIZE ; ++i){
 	  if (0 == handler->_leaf[i]._count){
 		  continue;
 	  }
 	  double dShang = - log(1.0 * handler->_leaf[i]._count / handler->_uLen) / log(2);
 	  shang += dShang * handler->_leaf[i]._count;
+
+	  scale = (int)(handler->_leaf[i]._count / ((double)maxCount / (double)256));
+	  if (0 == scale){
+		  handler->_leaf[i]._count = 1;
+	  }
+	  else {
+		  handler->_leaf[i]._count = scale;
+	  } 
   }
   printf("shang ---- %f, %f, %f\n", log(2), log(0.4), shang);
   handler->_status._dBestRate = (1 - (shang / (handler->_uLen << 3))) * 100;
@@ -351,6 +367,7 @@ static int stHfmSSortTree(st_hfms* handler)
 	}
 
 	// fixme, haha
+	stDebug("already abort()");
 	abort();
 
 	// all leaf's level <= ST_HUFFMAN_MAX_LEVEL

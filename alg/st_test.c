@@ -38,7 +38,7 @@ int test_algHuffmanS()
 	return -1;
   }
 
-  char contentFile[102400] = { 0 };
+  char contentFile[1024000] = { 0 };
   FILE* hFile = fopen("./test.file", "r");
   if (NULL == hFile){
 	  printf("err: %s\n", strerror(errno)); 
@@ -53,10 +53,10 @@ int test_algHuffmanS()
   }
   *++pos = 0;
 
-  char output[102400] = { '\0' };
+  char output[1024000] = { '\0' };
   uint32_t outLen = sizeof(output);
-  // stHfmSBuild(phfms, (BYTE*)contentFile, strlen(contentFile), output, &outLen);
-  stHfmSBuild(phfms, (BYTE*)content, strlen(content), output, &outLen);
+  stHfmSBuild(phfms, (BYTE*)contentFile, strlen(contentFile), output, &outLen);
+  //stHfmSBuild(phfms, (BYTE*)content, strlen(content), output, &outLen);
   stHfmSFree(phfms);
 
   return 0;
