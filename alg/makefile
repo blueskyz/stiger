@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g -Wall -fPIC -std=c99 -I../ -O -DDEBUG
+CFLAGS=-g -Wall -fPIC -std=c99 -I../ -O0 -DDEBUG
 #LDFLAGS=-L./lib -lm -liconv
 LDFLAGS=-L./lib -lm
 

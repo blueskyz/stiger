@@ -1,4 +1,5 @@
 
+#include <errno.h>
 #include <getopt.h>
 
 #include <alg/st_huffman_s.h>
@@ -14,11 +15,11 @@ void usage()
 
 int test_algHuffmanS()
 {
-  char output[102400] = { '\0' };
-  //const char content[] = "abababababababababccc,kkkkk9999899111222223434343434343434";
+	const char content[] = "uuuuuuuuuuuuvvvvvvvvvvvvvvvvvvwwwwwwwxxxxxxxxxxxxxxxyyyyyyyyyyyyyyyyyyyy";
+  // const char content[] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabababababababababccc,kkkkk9999899111222223434343434343434";
   // const char content[] = "aaa";
   // const char content[] = "aacabbaabcb";
-  const char content[] = "We emphasize libraries that work well with the C++ Standard Library. Boost libraries are intended to be widely useful, and usable across a broad spectrum of applications. The Boost license encourages both commercial and non-commercial use, We aim to establish 'existing practice' and provide reference implementations so that Boost libraries are suitable for eventual standardization. Ten Boost libraries are included in the C++ Standards Committee's Library Technical Report (TR1) and in the new C++11 Standard. C++11 also includes several more Boost libraries in addition to those from TR1. More Boost libraries are proposed for TR2 aacabbaabcb Boost works on almost any modern operating system, including UNIX and Windows variants. Follow the Getting Started Guide to download and install Boost. Popular Linux and Unix distributions such as Fedora, Debian, and NetBSD include pre-built Boost packages. Boost may also already be available on your organization's internal web serveri This document is designed to be an extremely gentle introduction, so we included a fair amount of material that may already be very familiar to you. To keep things simple, we also left out some information intermediate and advanced users will probably want. At the end of this document, we'll refer you on to resources that can help you pursue these topics further" \
+  // const char content[] = "We emphasize libraries that work well with the C++ Standard Library. Boost libraries are intended to be widely useful, and usable across a broad spectrum of applications. The Boost license encourages both commercial and non-commercial use, We aim to establish 'existing practice' and provide reference implementations so that Boost libraries are suitable for eventual standardization. Ten Boost libraries are included in the C++ Standards Committee's Library Technical Report (TR1) and in the new C++11 Standard. C++11 also includes several more Boost libraries in addition to those from TR1. More Boost libraries are proposed for TR2 aacabbaabcb Boost works on almost any modern operating system, including UNIX and Windows variants. Follow the Getting Started Guide to download and install Boost. Popular Linux and Unix distributions such as Fedora, Debian, and NetBSD include pre-built Boost packages. Boost may also already be available on your organization's internal web serveri This document is designed to be an extremely gentle introduction, so we included a fair amount of material that may already be very familiar to you. To keep things simple, we also left out some information intermediate and advanced users will probably want. At the end of this document, we'll refer you on to resources that can help you pursue these topics further" \
 			 "In a word, Productivity. Use of high-quality libraries like Boost speeds initial development, results in fewer bugs, reduces reinvention-of-the-wheel, and cuts long-term maintenance costs. And since Boost libraries tend to become de facto or de jure standards, many programmers are already familiar with them Ten of the Boost libraries are included in the C++ Standard Library's TR1, and so are slated for later full standardization. More Boost libraries are in the pipeline for TR2. Using Boost libraries gives an organization a head-start in adopting new technologies The Boost libraries tend to be new, fresh, and creative designs. They are not copies, clones, or derivations of proprietary libraries. Boost has a firm policy to respect the IP rights of others. The development of Boost libraries is publicly documented via the mailing lists and version control repository. The source code has been inspected by many, many knowledgeable programmers. Each Boost file has a copyright notice and license information. IP issues have been reviewed by the legal teams from some of the corporations which use Boost, and in some cases these lawyers have been kind enough to give Boost feedback on IP issues. There are no guarantees, but those factors all tend to reduce IP risk" \
 			 "Businesses and other organizations often prefer to have code developed, maintained, and improved in the open source community when it does not contain technology specific to their application domain, because it allows them to focus more development resources on their core business Individuals contribute for the technical challenge, to hone their technical skills, for the sense of community, as part of their graduate school programs, as a way around geographic isolation, to enhance their employment opportunities, and as advertisements for their consulting services. There are probably as many reasons as there are individuals. Some of the apparently individual contributions come from employees of support companies with contracts from businesses or other organizations who have an interest in seeing that a library is well-maintained." \
 			 "Boost doesn't really have any expenses! All the infrastructure is contributed by supporters, such as the Open Systems Lab at Indiana University, SourceForge, Boost Consulting, MetaCommunications, and the individuals, companies, and other organizations who run the regression tests. Borland, HP, Intel, and Microsoft have contributed compilers. And hundreds, or even thousands, of programmers contribute their time. That's what makes Boost possible." \
@@ -32,12 +33,29 @@ int test_algHuffmanS()
 
   printf("size=%u, content=%s\n", strlen(content), content);
   st_hfms* phfms = stHfmSNew();
-  uint32_t outLen = sizeof(output);
   if (NULL == phfms){
 	stErr("create huffman fail.");
 	return -1;
   }
 
+  char contentFile[102400] = { 0 };
+  FILE* hFile = fopen("./test.file", "r");
+  if (NULL == hFile){
+	  printf("err: %s\n", strerror(errno)); 
+	  return -1;
+  }
+  int nRead = 0;
+  char buf[10240] = { 0 };
+  char* pos = contentFile;
+  while(nRead = fread(buf, 1, sizeof(buf), hFile)){
+	  memcpy(pos, buf, nRead);
+	  pos += nRead;
+  }
+  *++pos = 0;
+
+  char output[102400] = { '\0' };
+  uint32_t outLen = sizeof(output);
+  // stHfmSBuild(phfms, (BYTE*)contentFile, strlen(contentFile), output, &outLen);
   stHfmSBuild(phfms, (BYTE*)content, strlen(content), output, &outLen);
   stHfmSFree(phfms);
 
