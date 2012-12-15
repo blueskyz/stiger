@@ -56,7 +56,7 @@ int test_algHuffmanS(char* iFile, char* oFile)
 		stErr("err: %s\n", strerror(errno)); 
 		return -1;
 	}
-	fwrite(output, 1, outLen, hOutFile);
+	fwrite(output, outLen, 1, hOutFile);
 	fclose(hOutFile);
 	uint32_t uEndTime = stTimer(timerType);
 	stLog("time %u ms", uEndTime - uBeginTime);

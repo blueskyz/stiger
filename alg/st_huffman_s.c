@@ -835,7 +835,11 @@ int stHfmSUncompress(st_hfms* handler,
 	uSetCounts = 1;
 	uint32_t uOutIdx = 0;
 	while (inBytePos < end){
-		stGetBitVal(&inBytePos, &uBitPos, &uValue, 1);
+		uValue = (inBytePos[0] >> (7 - uBitPos)) & 0x01;
+		++uBitPos;
+		inBytePos += uBitPos >> 3;
+		uBitPos &= 0x7;
+		// stGetBitVal(&inBytePos, &uBitPos, &uValue, 1);
 		stDebug("inBytPos=%u, uBitPos=%u, inValue=%u, uLeftOrRight=%u, %p, %p", 
 				inBytePos - input, uBitPos, inBytePos[0], uValue,
 				pCurNode->_child[0], pCurNode->_child[1]);
