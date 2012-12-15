@@ -18,6 +18,8 @@ st_hfms* stHfmSNew();
  */
 int stHfmSBuild(st_hfms* handler, BYTE* input, uint32_t uLen, BYTE* output, uint32_t* outLen);
 
+int stHfmSUncompress(st_hfms* handler, BYTE* input, int32_t uLen, BYTE* output, uint32_t* pOutLen);
+
 /*
  * @brief output zip content
  *

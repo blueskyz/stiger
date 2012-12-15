@@ -1,5 +1,5 @@
 /**
- * @file   st_darray.h
+ * @file   st_huffman_s.h
  * @author Clark <zhangshizhuo@gmail.com>
  * @date   Tue May 15 10:26:07 2012
  * 
@@ -12,9 +12,10 @@
 #include <alg/st_huffman_s.h>
 #include <alg/st_heap.h>
 
+typedef enum { ST_HFMS_OPER_COMPRESS, ST_HFMS_OPER_UNCOMPRESS } st_hfms_oper_type;
 typedef enum { ST_HFMS_TREE_NULL, ST_HFMS_TREE_NODE, ST_HFMS_TREE_LEAF } st_hfms_tree_type;
 
-#define ST_HUFFMAN_MAGIC_VER 0x0001
+#define ST_HUFFMAN_MAGIC_VER 0x01
 // data repeat 256: 3~6 tag, 257: 3~10 tag, 258: 11~256 259: end tag
 // code repeat 28: 3~6 tag, 29: 3~10 tag, 30: 11~256 
 #define DATA_SIZE (0x01 << 8)
@@ -47,6 +48,7 @@ typedef struct st_hfms_result {
 
 struct st_hfms{
   st_hfms_node* _tree;
+  st_hfms_oper_type _oper;
   uint16_t _uHeight;
   uint32_t _uLen;
   BYTE* _data;
@@ -78,9 +80,10 @@ static int stHfmSCreateTree(st_hfms* handler)
   // statistic
   uint32_t maxCount = 0;
   BYTE* input = handler->_data;
-  for (uint32_t i = 0 ; i < handler->_uLen ; ++i){
+  uint32_t i = 0;
+  for (i = 0 ; i < handler->_uLen ; ++i){
 	  if (input[i] > 128){
-		  stDebug("warning %u ascii=%u, %c", i, input[i], input[i]);
+		  // stDebug("warning %u ascii=%u, %c", i, input[i], input[i]);
 	  }
 	st_hfms_leaf* leaf = &handler->_leaf[input[i]];
 	if (leaf->_count == 0){
@@ -91,7 +94,7 @@ static int stHfmSCreateTree(st_hfms* handler)
 	++leaf->_count;
 	maxCount = max(leaf->_count, maxCount);
   }
-  stDebug("maxCount %u", maxCount);
+  stDebug("data length %u, total %u, maxCount %u", handler->_uLen, i, maxCount);
 
   // add eof tag
   handler->_leaf[CODE_SIZE-4]._type = ST_HFMS_TREE_LEAF;
@@ -130,7 +133,7 @@ static int stHfmSCreateTree(st_hfms* handler)
 		  handler->_leaf[i]._count = scale;
 	  } 
   }
-  printf("shang ---- %f, %f, %f\n", log(2), log(0.4), shang);
+  stDebug("shang ---- %f, %f, %f\n", log(2), log(0.4), shang);
   handler->_status._dBestRate = (1 - (shang / (handler->_uLen << 3))) * 100;
 
   st_heap* heapHandler = stHeapNew(CODE_SIZE, stHfmsByteUnitCmp);
@@ -206,7 +209,7 @@ static int stHfmSCreateTree(st_hfms* handler)
 		  stHeapPush(heapHandler, pNode);
 
 		  // debug log
-#ifdef DEBUG
+#ifdef DEBUG_DETAIL
 		  for (int i = 0 ; i < 2 ; ++i){
 			  if (NULL != pUnit[i] && ST_HFMS_IS_LEAF(pUnit[i])){
 				  stDebug("0 ascii=%u, count=%u", 
@@ -254,7 +257,7 @@ static int stHfmSCalcBitCode(st_hfms* handler)
 			continue;
 		}
 		uint32_t uLvlCount = handler->_arrLevelLeaf[iLvl];
-		stDebug("tree have leafs in level %d, counts=%u", iLvl, uLvlCount);
+		// stDebug("tree have leafs in level %d, counts=%u", iLvl, uLvlCount);
 		for (int i = 0 ; i < CODE_SIZE && 0 != uLvlCount ; ++i){
 			if (0 == leaf[i]._uBitCount || iLvl != leaf[i]._uBitCount){
 				continue;
@@ -273,12 +276,14 @@ static int stHfmSCalcBitCode(st_hfms* handler)
 				uLastCode += 1;
 			}
 			leaf[i]._code = uLastCode;
-			stDebug("tree ascii=%d code=%u level=%d bitcount=%d curCounts=%u", 
+			/*
+			stDebug("tree ascii=%d code=%u level=%d bitcount=%d lvlLeafCount=%u", 
 					ST_HFMS_CHAR_VAL(handler, &leaf[i]), 
 					leaf[i]._code,
 					iLvl,
 					leaf[i]._uBitCount,
 					uLvlCount);
+					*/
 			--uLvlCount;
 		}
 		uLastLevel = iLvl;
@@ -336,9 +341,8 @@ int stHfmSCalcLevel(st_hfms* handler)
 				node = node->_parent;
 				continue;
 			}
-			stDebug("tree %s node level=%d", sDir[uDir], node->_uBitCount);
+			// stDebug("tree %s node level=%d", sDir[uDir], node->_uBitCount);
 			node = node->_child[uDir];
-			//node->uBitCount = node->parent->uBitCount << 1 | uDir;
 			node->_uBitCount = node->_parent->_uBitCount + 1;
 		}
 		else if (ST_HFMS_IS_LEAF(node)){
@@ -402,8 +406,10 @@ static int stHfmSSortTree(st_hfms* handler)
 				// find leaf for swap
 				--handler->_arrLevelLeaf[uLvl];
 				handler->_arrLevelLeaf[uLvl+1] += 2;
+				/*
 				stDebug("tree Level=%d leafs=%d uCurLvlOff=%d", 
 						uLvl, handler->_arrLevelLeaf[uLvl], uCurLvlOff);
+						*/
 				break;
 			}
 			if (++uCurLvlOff > CODE_SIZE){
@@ -460,9 +466,45 @@ static int stHfmSSortTree(st_hfms* handler)
 	return 0;
 }
 
+
+static int stGetBitVal(BYTE** ppBuf, 
+		uint32_t* pBitOffset,
+		uint32_t* pValue, 
+		uint32_t uBitLen)
+{
+	assert(*ppBuf && (*pBitOffset < 8) && (NULL != pValue) && (0 != uBitLen));
+	BYTE* buf = *ppBuf;
+	*pValue = 0;
+	uint32_t uOldBitLen = uBitLen;
+	uint32_t uIdx = 0;
+	uint32_t uLeftBit = 8 - (*pBitOffset & 0x07);
+	while (uBitLen > 0){
+		// process
+		if (uBitLen >= uLeftBit){
+			uBitLen -= uLeftBit;
+			*pValue |= (buf[uIdx] << uBitLen);
+			++uIdx;
+			uLeftBit = 8;
+		}
+		else {
+			uLeftBit -= uBitLen;
+			uBitLen = 0;
+			*pValue |= (buf[uIdx] >> uLeftBit);
+		}
+	}
+	*pValue &= (~(uint32_t)0x0 >> ((sizeof(uint32_t) << 3) - uOldBitLen));
+
+	// reset length status
+	*ppBuf += uIdx;
+	*pBitOffset = 8 - uLeftBit;
+	return 0;
+}
+
 // buf enough
-static int stSetBitVal(BYTE** ppBuf, uint32_t* pBitOffset, 
-		uint32_t uValue, uint32_t uBitLen)
+static int stSetBitVal(BYTE** ppBuf, 
+		uint32_t* pBitOffset, 
+		uint32_t uValue, 
+		uint32_t uBitLen)
 {
 	assert(*ppBuf && (*pBitOffset < 8) && (0 != uBitLen));
 
@@ -475,7 +517,7 @@ static int stSetBitVal(BYTE** ppBuf, uint32_t* pBitOffset,
 		if (uBitLen >= uLeftBit){
 			uBitLen -= uLeftBit;
 			buf[uIdx] |= (uValue >> uBitLen);
-			uValue &= (~0x0 >> (sizeof(uint32_t) - uBitLen));
+			uValue &= (~(uint32_t)0x0 >> ((sizeof(uint32_t) << 3) - uBitLen));
 			++uIdx;
 			uLeftBit = 8;
 		}
@@ -542,9 +584,11 @@ static int stHfmSCompress(st_hfms* handler, BYTE* out, uint32_t* pOutLen)
 					stSetBitVal(&outBytePos, &uBitPos, 0x1e, 5);
 					stSetBitVal(&outBytePos, &uBitPos, uSetCounts - 3, 8);
 				}
-				stDebug("write off=%u, bitlength=%u, repeats=%u, size=%u bit",
+				stDebug("write off=%u, val=%u, bitlength=%u, code=%u, repeats=%u, size=%u bit",
 						uLastPos, 
+						outBytePos[0],
 						lastBitLen, 
+						leaf[uLastPos]._code,
 						uSetCounts,
 						((outBytePos - curOutBytePos) << 3) + uBitPos - uCurBitPos);
 			}
@@ -553,9 +597,11 @@ static int stHfmSCompress(st_hfms* handler, BYTE* out, uint32_t* pOutLen)
 					// write encode
 					stSetBitVal(&outBytePos, &uBitPos, lastBitLen, 5);
 				}
-				stDebug("write off=%u, bitlength=%u, times=%u, size=%u bit",
+				stDebug("write off=%u, val=%u, bitlength=%u, code=%u, times=%u, size=%u bit",
 						uLastPos, 
+						outBytePos[0],
 						lastBitLen, 
+						leaf[uLastPos]._code,
 						uSetCounts,
 						((outBytePos - curOutBytePos) << 3) + uBitPos - uCurBitPos);
 
@@ -611,10 +657,8 @@ static int stHfmSCompress(st_hfms* handler, BYTE* out, uint32_t* pOutLen)
 							leaf[258]._code, leaf[258]._uBitCount);
 					stSetBitVal(&outBytePos, &uBitPos, uSetCounts - 3, 8);
 				}
-				stDebug("value=%c, uLastIdx=%u, repeats=%u, bit size=%u, " \
-						"256=%u, 257=%u, 258=%u",
-						data, uLastIdx, uSetCounts, leaf[data]._uBitCount,
-						leaf[256]._uBitCount, leaf[257]._uBitCount, leaf[258]._uBitCount);
+				stDebug("value=%c, uLastIdx=%u, repeats=%u, bit size=%u",
+						data, uLastIdx, uSetCounts, leaf[data]._uBitCount);
 			}
 			else {
 				for (int j = 0 ; j < uSetCounts ; ++j){
@@ -622,13 +666,13 @@ static int stHfmSCompress(st_hfms* handler, BYTE* out, uint32_t* pOutLen)
 					stSetBitVal(&outBytePos, &uBitPos, 
 							leaf[data]._code, leaf[data]._uBitCount);
 				}
-				stDebug("no length value=%c, uLastIdx=%u, repeats=%u, bit size=%u, " \
-						"256=%u, 257=%u, 258=%u",
-						data, uLastIdx, uSetCounts, leaf[data]._uBitCount,
-						leaf[256]._uBitCount, leaf[257]._uBitCount, leaf[258]._uBitCount);
+				stDebug("no length value=%c, uLastIdx=%u, repeats=%u, bit size=%u",
+						data, uLastIdx, uSetCounts, leaf[data]._uBitCount);
 			}
 			if (i < handler->_uLen){
-				// stDebug("current uLastIdx=%u, next Idx=%u", uLastIdx, i);
+				stDebug("current outPos=%u, uBitPos=%u, uLastIdx=%u, next Idx=%u", 
+						outBytePos - out, uBitPos, uLastIdx, i);
+				outBytePos - out,
 				uLastIdx = i;
 				uSetCounts = 1;
 				uLastPos = i;
@@ -644,14 +688,191 @@ static int stHfmSCompress(st_hfms* handler, BYTE* out, uint32_t* pOutLen)
 	handler->_status._dCompressRate = 100 - 100.0 * handler->_status._uCompressSize 
 		/ handler->_uLen;
 
+	*pOutLen = handler->_status._uCompressSize + handler->_status._uHeaderSize;
+	stDebug("value 0=%u, 1=%u, 2=%u, len %u", out[0], out[1], out[4], *pOutLen);
+
 	// compress result status
-	stDebug("compress content size=%u bytes, header size=%u, " \
+	stLog("compress content size=%u bytes, header size=%u, " \
 			"out size=%u, rate=%f, bestRate=%f", 
 			handler->_uLen,
 			handler->_status._uHeaderSize,
 			handler->_status._uCompressSize,
 			handler->_status._dCompressRate,
 			handler->_status._dBestRate);
+
+	return 0;
+}
+
+int stHfmSUncompress(st_hfms* handler, 
+		BYTE* input, 
+		int32_t uLen, 
+		BYTE* out, 
+		uint32_t* pOutLen)
+{
+	assert(NULL != handler && NULL != out && 0 != *pOutLen);
+	if (NULL == handler || NULL == out || 0 == *pOutLen){
+		stErr("uncompress error, handler(%s), out(%s), *pOutLen(%d)",
+				(NULL == handler) ? "null" : "not null",
+				(NULL == out) ? "null" : "not null",
+				*pOutLen);
+		return -1;
+	}
+
+	/*
+	if (ST_HFMS_OPER_UNCOMPRESS != handler->_oper){
+		stErr("uncompress error, oper type(%s)",
+				(ST_HFMS_OPER_UNCOMPRESS != handler->_oper) ? "type error" : "type yes");
+		return -1;
+	}
+	*/
+
+	// check header
+	uint32_t idx = 0;
+	char version = input[idx++];
+	char option = input[idx++];
+	stDebug("version=%u, option=%u, char=%u", version, option, input[4]);
+	// restore code table
+	st_hfms_leaf* leaf = handler->_leaf;
+	BYTE lastBitLen = 0;
+	uint32_t uLastPos = 0;
+	uint32_t uSetCounts = 1;
+	uint32_t uBitPos = 0;
+	uint32_t uValue = 0;
+	uint32_t uLastValue = 0;
+	BYTE* inBytePos = &input[idx];
+	BYTE* curBytePos = inBytePos;
+	for (int i = 0 ; i < CODE_SIZE ; ){
+		stGetBitVal(&inBytePos, &uBitPos, &uValue, 5);
+
+		// fixme, array hash ...
+		// 3~6
+		if (0x1c == uValue){
+			stGetBitVal(&inBytePos, &uBitPos, &uValue, 2);
+			uSetCounts = uValue + 3 - 1;
+		}
+		// 3~10
+		else if (0x1d == uValue){
+			stGetBitVal(&inBytePos, &uBitPos, &uValue, 3);
+			uSetCounts = uValue + 3 - 1;
+		}
+		// 3~256
+		else if (0x1e == uValue){
+			stGetBitVal(&inBytePos, &uBitPos, &uValue, 8);
+			uSetCounts = uValue + 3 - 1;
+		}
+		else {
+			uSetCounts = 1;
+			uLastValue = uValue;
+		}
+		int j = 0;
+		for ( ; j < uSetCounts ; ++j){
+			leaf[i+j]._type = ST_HFMS_TREE_LEAF;
+			leaf[i+j]._uBitCount = uLastValue;
+			stDebug("read off=%d, pos=%u, count=%u bitcount=%u", 
+					i+j, inBytePos - input, uSetCounts, leaf[i+j]._uBitCount);
+		}
+		i += uSetCounts;
+		// leaf[i]
+	}
+
+	// calc code from bit length
+	stHfmSCalcBitCode(handler);
+
+	// build tree
+	uint32_t uNodeIdx = 0;
+	uint32_t uDir = 0; // 0: left , 1: right
+	st_hfms_node* pRootNode = &handler->_node[uNodeIdx];
+	stDebug("root node %p", pRootNode);
+	st_hfms_node* pCurNode = pRootNode;
+	pRootNode->_type = ST_HFMS_TREE_NODE;
+	pRootNode->_parent = pRootNode->_child[0] = pRootNode->_child[1] = NULL;
+	handler->_tree = pRootNode;
+	leaf = handler->_leaf;
+	++uNodeIdx;
+	for (uint32_t i = 0 ; i < CODE_SIZE ; ++i){
+		if (0 == leaf[i]._uBitCount){
+			continue;
+		}
+		pCurNode = pRootNode;
+		uValue = leaf[i]._code;
+		for (int j = leaf[i]._uBitCount - 1 ; j >= 0 ; --j){
+			if ((0x01 << j) & uValue){ // right
+				uDir = 1;
+			}
+			else { // left
+				uDir = 0;
+			}
+			if (0 == j){
+				if (NULL != pCurNode->_child[uDir]){
+					stErr("file format err, leaf %u exists, len %u", i, j);
+				}
+				pCurNode->_child[uDir] = &leaf[i];
+				pCurNode->_child[uDir]->_parent = pCurNode;
+			}
+			else if (NULL == pCurNode->_child[uDir]){
+				pCurNode->_child[uDir] = &handler->_node[uNodeIdx++];
+				pCurNode->_child[uDir]->_type = ST_HFMS_TREE_NODE;
+				pCurNode->_child[uDir]->_parent = pCurNode;
+				pCurNode->_child[uDir]->_child[0] = NULL;
+				pCurNode->_child[uDir]->_child[1] = NULL;
+			}
+			pCurNode = pCurNode->_child[uDir];
+			stDebug("i=%u, uValue=%u, len=%u, curNode=%p, parent=%p", 
+					i, uValue, leaf[i]._uBitCount, pCurNode, pCurNode->_parent);
+		}
+		/*
+		stDebug("i=%u, uValue=%u, len=%u, parent=%p", 
+				i, uValue, leaf[i]._uBitCount, pCurNode);
+				*/
+	}
+
+	// uncompress data
+	curBytePos = inBytePos;
+	BYTE* end = input + uLen;
+	pCurNode = pRootNode;
+	stDebug("root node %p", pRootNode);
+	uLastValue = 0;
+	uSetCounts = 1;
+	uint32_t uOutIdx = 0;
+	while (inBytePos < end){
+		stGetBitVal(&inBytePos, &uBitPos, &uValue, 1);
+		stDebug("inBytPos=%u, uBitPos=%u, inValue=%u, uLeftOrRight=%u, %p, %p", 
+				inBytePos - input, uBitPos, inBytePos[0], uValue,
+				pCurNode->_child[0], pCurNode->_child[1]);
+		pCurNode = pCurNode->_child[uValue];
+		if (ST_HFMS_IS_LEAF(pCurNode)){
+			uValue = ((st_hfms_leaf*)pCurNode)->_code;
+			if (uValue == leaf[256]._code){ // 3~6
+				stGetBitVal(&inBytePos, &uBitPos, &uValue, 2);
+				uSetCounts = uValue + 3 - 1;
+			}
+			else if (uValue == leaf[257]._code){ // 3~10
+				stGetBitVal(&inBytePos, &uBitPos, &uValue, 3);
+				uSetCounts = uValue + 3 - 1;
+			}
+			else if (uValue == leaf[258]._code){ // 3~256
+				stGetBitVal(&inBytePos, &uBitPos, &uValue, 8);
+				uSetCounts = uValue + 3 - 1;
+			}
+			else if (uValue == leaf[259]._code){ // end
+				break;
+			}
+			else {
+				uSetCounts = 1;
+				uLastValue = ST_HFMS_CHAR_VAL(handler, pCurNode);
+			}
+			stDebug("setCounts=%u", uSetCounts);
+			uint32_t j = 0;
+			for ( ; j < uSetCounts ; ++j){
+				out[uOutIdx++] = uLastValue;
+			}
+			stDebug("uIdx=%u, counts=%u, ascii=%c", 
+					uOutIdx, uSetCounts, out[uOutIdx-1]);
+			pCurNode = pRootNode;
+		}
+	}
+	stDebug("out size %u", uOutIdx);
+	*pOutLen = uOutIdx;
 
 	return 0;
 }
